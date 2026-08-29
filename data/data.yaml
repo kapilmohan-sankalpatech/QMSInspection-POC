@@ -1,0 +1,20 @@
+# Dataset config for glass/metal defect detection
+# Edit `path`, `train`, `val` to point at your actual dataset location.
+
+path: ../dataset          # root dir containing images/ and labels/
+train: images/train       # relative to 'path'
+val: images/val           # relative to 'path'
+
+# Number of classes
+nc: 8
+
+# Class names — edit to match the defect types on your line
+names:
+  0: scratch
+  1: crack
+  2: bubble
+  3: dent
+  4: inclusion
+  5: stain
+  6: chip
+  7: burr
