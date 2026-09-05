@@ -4,14 +4,39 @@ sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/ssh
 # Allow root login with password
 sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 
+# Generate SSH host keys if they do not exist
+ssh-keygen -A
+
 # Verify SSH configuration
-sshd -t
+if ! sshd -t; then
+    echo "ERROR: SSH configuration is invalid."
+    exit 1
+fi
+
+echo "SSH configuration is valid."
 
 # Set root password
-echo "root:${SSH_PASSWORD}" | chpasswd
+if [ -n "${SSH_PASSWORD}" ]; then
+    echo "root:${SSH_PASSWORD}" | chpasswd
+    echo "Root password configured."
+else
+    echo "WARNING: SSH_PASSWORD is not set."
+    echo "Use 'passwd' manually to set the root password."
+fi
 
 # Restart SSH without systemctl
-service ssh restart
+service ssh restart || /usr/sbin/sshd
+
+# Verify SSH is listening
+if ss -lntp | grep -q ':22 '; then
+    echo "SSH is running and listening on port 22."
+else
+    echo "WARNING: SSH does not appear to be listening on port 22."
+fi
+
+
+
+
 
 
 
