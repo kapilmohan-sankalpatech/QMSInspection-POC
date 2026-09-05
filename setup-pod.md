@@ -1,8 +1,8 @@
 # RunPod Setup and Inference
 
-## 1. Configure SSH on the RunPod
+## 1. Configure SSH on RunPod
 
-Run the following commands inside the RunPod container:
+Run the following inside the RunPod Pod:
 
 ```bash
 # Enable password authentication
@@ -32,7 +32,7 @@ else
     echo "passwd"
 fi
 
-# Restart SSH without systemctl
+# Restart SSH
 service ssh restart || /usr/sbin/sshd
 
 # Verify SSH is listening
@@ -42,46 +42,48 @@ else
     echo "WARNING: SSH does not appear to be listening on port 22."
 fi
 
-echo "If there was no error above, set the password using 'passwd' if required."
+echo "SSH setup completed."
 ```
 
-If `SSH_PASSWORD` is not configured, set the root password manually:
+If `SSH_PASSWORD` was not provided, set the password manually:
 
 ```bash
 passwd
 ```
 
-Enter the password when prompted.
-
 ---
 
-## 2. Login to the RunPod Using SSH
+## 2. Connect to the RunPod Pod
 
-From your local Windows machine:
+From your Windows machine:
 
-```powershell
-ssh -p 22072 root@194.68.245.123
+```bash
+ssh -p 22170 root@194.68.245.123
 ```
 
-Enter the root password configured in the previous step.
-
 ---
 
-## 3. Check NVIDIA GPU and PyTorch
+## 3. Check NVIDIA GPU
 
-After logging into the RunPod, check the GPU:
+Inside the RunPod Pod:
 
 ```bash
 nvidia-smi
 ```
 
-Then check PyTorch and CUDA:
+You should see the NVIDIA GPU information.
+
+---
+
+## 4. Check PyTorch and CUDA
+
+Run:
 
 ```bash
 python3 -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('PyTorch CUDA:', torch.version.cuda); print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
 ```
 
-You should see information similar to:
+Expected output should look similar to:
 
 ```text
 PyTorch: 2.x.x
@@ -90,71 +92,43 @@ PyTorch CUDA: 12.x
 GPU: NVIDIA L4
 ```
 
-The exact versions may vary depending on the RunPod image.
+The exact CUDA/PyTorch versions depend on the RunPod image.
 
 ---
 
-## 4. Go to the Project Directory
+## 5. Go to the Project
 
 ```bash
 cd /workspace/QMSInspection-POC
 ```
 
-Verify the project files:
+Check the files:
 
 ```bash
-ls -lah
+ls -la
 ```
 
 ---
 
-## 5. Install Python Dependencies
+## 6. Install Python Dependencies
 
-Install all dependencies from `requirements.txt`:
+Install everything from `requirements.txt`:
 
 ```bash
 python3 -m pip install -r requirements.txt
 ```
 
-The `requirements.txt` should contain:
+### Important: NumPy version
 
-```text
-# Core
-ultralytics>=8.2.0
-opencv-python>=4.9.0
-numpy==1.26.4
-pyyaml>=6.0
-pillow>=10.0.0
-matplotlib>=3.8.0
-
-# ONNX / export tooling
-onnx>=1.16.0
-onnxsim>=0.4.36
-onnxruntime-gpu>=1.18.0
-
-# TensorRT
-tensorrt>=10.0.0
-pycuda>=2024.1
-
-# Note: torch/torchvision are installed separately with the
-# correct CUDA-specific version.
-```
-
-### Why NumPy 1.26.4?
-
-The RunPod PyTorch environment may use a PyTorch build compiled against NumPy 1.x. Using NumPy 2.x can result in:
-
-```text
-RuntimeError: Numpy is not available
-```
-
-Therefore, keep:
+The project requires:
 
 ```text
 numpy==1.26.4
 ```
 
-Verify NumPy:
+This avoids compatibility issues with packages compiled against NumPy 1.x.
+
+Verify:
 
 ```bash
 python3 -c "import numpy; print('NumPy:', numpy.__version__)"
@@ -166,171 +140,140 @@ Expected:
 NumPy: 1.26.4
 ```
 
-Verify all installed packages:
-
-```bash
-python3 -m pip list
-```
-
 ---
 
-## 6. Verify Ultralytics
+## 7. Verify Python Environment
 
 Run:
 
 ```bash
-python3 -c "import ultralytics; print('Ultralytics:', ultralytics.__version__)"
-```
-
-Expected output:
-
-```text
-Ultralytics: 8.x.x
+python3 -c "import numpy; import torch; import ultralytics; print('NumPy:', numpy.__version__); print('PyTorch:', torch.__version__); print('CUDA:', torch.cuda.is_available()); print('Ultralytics:', ultralytics.__version__)"
 ```
 
 ---
 
-## 7. Run Inference
+## 8. Run YOLO Inference
 
-Run the crack segmentation model against the input folder:
+Input folder:
+
+```text
+/workspace/QMSInspection-POC/input/defect-free/
+```
+
+Run:
 
 ```bash
 python3 setup_pretrained_yolo_model.py --source /workspace/QMSInspection-POC/input/defect-free/
 ```
 
-You can also specify a confidence threshold:
+With a custom confidence threshold:
 
 ```bash
 python3 setup_pretrained_yolo_model.py --source /workspace/QMSInspection-POC/input/defect-free/ --conf 0.5
 ```
 
-The script will automatically download the pretrained model if it does not already exist:
+The model:
 
 ```text
 crack_seg_yolov8n.pt
 ```
 
-The default output directory is:
+will be downloaded automatically if it does not already exist.
+
+---
+
+## 9. Check Inference Output
+
+The configured output directory is:
 
 ```text
-/workspace/QMSInspection-POC/outputs/
+/workspace/QMSInspection-POC/outputs
 ```
 
 Ultralytics creates a prediction directory such as:
 
 ```text
-/workspace/QMSInspection-POC/outputs/predict/
+/workspace/QMSInspection-POC/outputs/predict-2
 ```
 
-or:
-
-```text
-/workspace/QMSInspection-POC/outputs/predict-2/
-```
-
-depending on how many times inference has been run.
-
----
-
-## 8. Verify the Inference Output
-
-List the output directories:
+Check:
 
 ```bash
 ls -lah /workspace/QMSInspection-POC/outputs/
 ```
 
-For example:
-
-```text
-predict/
-predict-2/
-```
-
-Check the latest prediction folder:
+Then:
 
 ```bash
 ls -lah /workspace/QMSInspection-POC/outputs/predict-2/
 ```
 
-The generated images will be inside this directory.
+---
+
+## 10. Download Results to Windows
+
+From your **Windows machine**, run:
+
+```powershell
+scp -P 22170 -r root@194.68.245.123:/workspace/QMSInspection-POC/outputs/predict-2 C:\workspace\QMSInspection-POC\outputs\
+```
+
+This copies the complete `predict-2` directory from RunPod to your local machine.
+
+If the output directory is different, replace `predict-2` with the actual directory name.
 
 ---
 
-## 9. Download Inference Results to Local Machine
+# Complete Workflow
 
-From your **local Windows PowerShell**, download the prediction results:
+### On RunPod
 
-```powershell
-scp -P 22072 -r root@194.68.245.123:/workspace/QMSInspection-POC/outputs/predict-2 C:\workspace\QMSInspection-POC\outputs\
+```bash
+cd /workspace/QMSInspection-POC
 ```
 
-The results will be available locally at:
-
-```text
-C:\workspace\QMSInspection-POC\outputs\predict-2\
+```bash
+nvidia-smi
 ```
 
-If the prediction directory is `predict` instead:
+```bash
+python3 -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No GPU')"
+```
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+```bash
+python3 setup_pretrained_yolo_model.py --source /workspace/QMSInspection-POC/input/defect-free/
+```
+
+Check:
+
+```bash
+ls -lah /workspace/QMSInspection-POC/outputs/
+```
+
+### On Windows
 
 ```powershell
-scp -P 22072 -r root@194.68.245.123:/workspace/QMSInspection-POC/outputs/predict C:\workspace\QMSInspection-POC\outputs\
+scp -P 22170 -r root@194.68.245.123:/workspace/QMSInspection-POC/outputs/predict-2 C:\workspace\QMSInspection-POC\outputs\
 ```
 
 ---
 
-## Complete Workflow
-
-For a fresh RunPod, the overall process is:
-
-```text
-1. Configure SSH
-       ↓
-2. Generate SSH host keys
-       ↓
-3. Validate SSH configuration
-       ↓
-4. Set root password
-       ↓
-5. Start SSH
-       ↓
-6. SSH into RunPod
-       ↓
-7. Check nvidia-smi
-       ↓
-8. Check PyTorch + CUDA
-       ↓
-9. cd /workspace/QMSInspection-POC
-       ↓
-10. Install requirements.txt
-       ↓
-11. Verify NumPy / PyTorch / Ultralytics
-       ↓
-12. Run inference
-       ↓
-13. Verify outputs
-       ↓
-14. Download outputs to local machine
-```
-
-## Quick Commands
+# Quick Commands
 
 ### SSH
 
-```powershell
-ssh -p 22072 root@194.68.245.123
+```bash
+ssh -p 22170 root@194.68.245.123
 ```
 
 ### GPU
 
 ```bash
 nvidia-smi
-```
-
-### PyTorch + CUDA
-
-```bash
-python3 -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('PyTorch CUDA:', torch.version.cuda); print('GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
 ```
 
 ### Project
@@ -345,10 +288,16 @@ cd /workspace/QMSInspection-POC
 python3 -m pip install -r requirements.txt
 ```
 
-### Verify packages
+### Check NumPy
 
 ```bash
-python3 -m pip list
+python3 -c "import numpy; print(numpy.__version__)"
+```
+
+### Check PyTorch/CUDA
+
+```bash
+python3 -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None')"
 ```
 
 ### Run inference
@@ -357,54 +306,30 @@ python3 -m pip list
 python3 setup_pretrained_yolo_model.py --source /workspace/QMSInspection-POC/input/defect-free/
 ```
 
-### Check output
-
-```bash
-ls -lah /workspace/QMSInspection-POC/outputs/
-```
-
-### Download output to Windows
-
-Run from **local PowerShell**:
+### Download results
 
 ```powershell
-scp -P 22072 -r root@194.68.245.123:/workspace/QMSInspection-POC/outputs/predict-2 C:\workspace\QMSInspection-POC\outputs\
+scp -P 22170 -r root@194.68.245.123:/workspace/QMSInspection-POC/outputs/predict-2 C:\workspace\QMSInspection-POC\outputs\
 ```
 
-## 10. Create a Reusable RunPod Image
+---
 
-Once the following are successfully verified:
+# Optional: Create a Reusable RunPod Image
 
-```text
-✓ SSH working
-✓ NVIDIA GPU detected
-✓ PyTorch working
-✓ CUDA available
-✓ NumPy 1.26.4
-✓ Ultralytics installed
-✓ requirements.txt installed
-✓ Model downloaded
-✓ Inference completed successfully
-```
+Once the Pod is fully configured and inference is working:
 
-Create a **custom RunPod image** from this configured Pod.
+1. Stop making changes to the environment.
+2. Create a custom image from the configured Pod using RunPod's image/template workflow.
+3. The image should contain:
 
-The image can then be reused to create new Pods without reinstalling the Python dependencies every time.
+   * CUDA environment
+   * Python
+   * PyTorch
+   * Ultralytics
+   * ONNX dependencies
+   * TensorRT dependencies
+   * Project dependencies
+4. Keep frequently changing inspection images outside the image.
+5. New Pods created from the image can then start with the required environment already installed.
 
-Keep frequently changing data such as inspection images outside the image where possible:
-
-```text
-RunPod Image
-├── Python
-├── CUDA
-├── PyTorch
-├── Ultralytics
-└── Required packages
-
-QMSInspection-POC
-├── setup_pretrained_yolo_model.py
-├── requirements.txt
-├── crack_seg_yolov8n.pt
-├── input/
-└── outputs/
-```
+This avoids reinstalling all Python dependencies every time a new Pod is created.
